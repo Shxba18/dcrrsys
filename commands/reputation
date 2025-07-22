@@ -1,0 +1,67 @@
+const { EmbedBuilder } = require("discord.js");
+
+const reputationData = new Map(); // Ukládá reputace a časy
+
+module.exports = {
+  name: "rep",
+  description: "Zobrazí nebo udělí reputaci",
+
+  async execute(message, args) {
+    const sub = args[0];
+
+    if (sub === "view") {
+      let target = message.mentions.users.first() || message.author;
+
+      const rep = reputationData.get(target.id) || { given: 0, received: 0, lastGiven: 0 };
+
+      const embed = new EmbedBuilder()
+        .setTitle(`📊 reputation ${target.username}`)
+        .setColor("#000000")
+        .setImage('https://media.tenor.com/WIG0ro4UEYIAAAAd/lean-po-sum-mo.gif')
+        .setThumbnail(target.displayAvatarURL())
+        .addFields(
+          { name: " rep given", value: `${rep.given}`, inline: true },
+          { name: "rep received", value: `${rep.received}`, inline: true }
+        );
+
+      return message.reply({ embeds: [embed] });
+    }
+
+    else if (sub === "give") {
+      const target = message.mentions.users.first();
+      if (!target) return message.reply("❌ Označ uživatele, kterému chceš dát reputaci.");
+      if (target.bot) return message.reply("❌ Nemůžeš dávat reputaci botům.");
+      if (target.id === message.author.id) return message.reply("❌ Nemůžeš dát reputaci sám sobě.");
+
+      const now = Date.now();
+      const authorData = reputationData.get(message.author.id) || { given: 0, received: 0, lastGiven: 0 };
+
+      if (now - authorData.lastGiven < 24 * 60 * 60 * 1000) {
+        const remaining = 24 * 60 * 60 * 1000 - (now - authorData.lastGiven);
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        return message.reply(`🕒 Můžeš znovu dát reputaci za ${hours}h ${minutes}min.`);
+      }
+
+      authorData.given += 1;
+      authorData.lastGiven = now;
+      reputationData.set(message.author.id, authorData);
+
+      const targetData = reputationData.get(target.id) || { given: 0, received: 0, lastGiven: 0 };
+      targetData.received += 1;
+      reputationData.set(target.id, targetData);
+
+      const embed = new EmbedBuilder()
+        .setColor("#4B0082")
+        .setDescription(`✅ ${target} získal +1 reputaci!`)
+        .setFooter({ text: `Od ${message.author.username}` })
+        .setTimestamp();
+
+      return message.reply({ embeds: [embed] });
+    }
+
+    else {
+      return message.reply("❌ Použití: `!rep view [@uživatel]` nebo `!rep give @uživatel`");
+    }
+  }
+};
